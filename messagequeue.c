@@ -22,14 +22,23 @@ typedef struct message_queue{
 
 } message_queue;
 
+message make_message(char* c, int s, int st, int at){
 
+  message m;
+  m.content = c;
+  m.sender = s;
+  m.send_time = st;
+  m.arrive_time = at;
+  return m;
 
-message_queue* make_queue(){
+}
 
-  message_queue* q = malloc(sizeof(message_queue));
-  q->num_messages = 0;
-  q->capacity = 10;
-  q->messages = malloc(10 * sizeof(message));
+message_queue make_queue(){
+
+  message_queue q;
+  q.num_messages = 0;
+  q.capacity = 10;
+  q.messages = malloc(10 * sizeof(message));
 
   return q;
 
@@ -70,10 +79,10 @@ void heapify(message_queue* q){
 
 }
 
-void add_to_queue(message_queue* q, message* m){
+void add_to_queue(message_queue* q, message m){
 
   if(q->num_messages == q->capacity) resize(q);
-  q->messages[q->num_messages] = *m;
+  q->messages[q->num_messages] = m;
   q->num_messages++;
   heapify(q);
 
@@ -90,6 +99,12 @@ message top(message_queue* q){
   q->num_messages--;
   heapify(q);
   return t;
+
+}
+
+void delete(message_queue* q){
+
+  free(q->messages);
 
 }
 

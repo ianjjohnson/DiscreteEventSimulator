@@ -1,4 +1,4 @@
-#define RUNTIME 100
+#define RUNTIME 5
 #define DEBUG 3
 
 #include <stdio.h>

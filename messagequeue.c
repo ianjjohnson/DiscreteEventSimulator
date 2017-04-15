@@ -97,6 +97,7 @@ message top(message_queue* q){
   message t = q->messages[0];
   q->messages[0] = q->messages[q->num_messages - 1];
   q->num_messages--;
+  swap(q->messages, 0, q->num_messages);
   heapify(q);
   return t;
 

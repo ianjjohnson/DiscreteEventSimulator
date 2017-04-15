@@ -1,4 +1,5 @@
-#define RUNTIME 1000000000 //1 million
+#define RUNTIME 100
+#define DEBUG 3
 
 #include <stdio.h>
 #include "client.c"
@@ -9,13 +10,14 @@ void startup(client* clients, int num_clients){
 
   for(int i = 0; i < num_clients; i++)
     for(int j = i+1; j < num_clients; j++)
-      send_message(clients + j, make_message("Hello!", i, -1, 0));
+      send_message(clients + j, make_message("Init_message", i, -1, 0));
 
 }
 
-void loop(client* clients, int time){
+void loop(client* clients, int num_clients, int time){
 
-  return;
+  for(int i = 0; i < num_clients; i++)
+    process_messages_for_time(clients, i, time);
 
 }
 
@@ -33,7 +35,7 @@ int main(int argc, char* argv[]){
   startup(clients, num_clients);
 
   for(int i = 0; i < RUNTIME; i++)
-    loop(clients, i);
+    loop(clients, num_clients, i);
 
   free(clients);
 

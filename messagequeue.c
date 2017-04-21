@@ -1,8 +1,11 @@
 #ifndef MSGQ_C
 #define MSGQ_C
 
+#define MIN(X, Y) (((X) < (Y))? (X) : Y);
+
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 typedef struct message {
 
@@ -79,6 +82,30 @@ void heapify(message_queue* q){
 
 }
 
+void heapify_top(message_queue* q){
+
+  int index = 0;
+
+  while(index < q->num_messages){
+
+    int left  = index * 2 + 1;
+    int right = index * 2 + 2;
+
+    int left_val  = (left >= q->num_messages)?  INT_MAX : q->messages[left].arrive_time;
+    int right_val = (right >= q->num_messages)? INT_MAX : q->messages[right].arrive_time;
+
+    int loc_min = ((left_val < right_val)? left : right);
+    int min = MIN(left_val, right_val);
+
+    if(min < q->messages[index].arrive_time) swap(q->messages, index, loc_min);
+
+    index = loc_min;
+
+  }
+
+
+}
+
 void add_to_queue(message_queue* q, message m){
 
   if(q->num_messages == q->capacity) resize(q);
@@ -97,8 +124,7 @@ message top(message_queue* q){
   message t = q->messages[0];
   q->messages[0] = q->messages[q->num_messages - 1];
   q->num_messages--;
-  swap(q->messages, 0, q->num_messages);
-  heapify(q);
+  heapify_top(q);
   return t;
 
 }

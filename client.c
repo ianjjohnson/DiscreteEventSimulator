@@ -35,7 +35,7 @@ void process_messages_for_time(client* clients, int client_id, int time){
   while(min_arrival_time(&(c->queue)) == time && c->queue.num_messages > 0){
 
     message m = top(&(c->queue));
-    send_message(clients + m.sender, make_message("Hello!", c->id, time, time+1));
+    send_message(clients + m.sender, make_message("Hello!", c->id, time, time+1, 0, 0));
 
     if(DEBUG) printf("Message: %s received by client %i from client %i at time %i.\n", m.content, c->id, m.sender, time);
 

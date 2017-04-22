@@ -1,8 +1,9 @@
 #define RUNTIME 5
-#define DEBUG 3
+#define DEBUG 0
 
 #include <stdio.h>
 #include "client.c"
+#include "controller.c"
 
 void startup(client* clients, int num_clients){
 
@@ -10,7 +11,7 @@ void startup(client* clients, int num_clients){
 
   for(int i = 0; i < num_clients; i++)
     for(int j = i+1; j < num_clients; j++)
-      send_message(clients + j, make_message("Init_message", i, -1, 0));
+      send_message(clients + j, make_message("Init_message", i, -1, 0, 0, 0));
 
 }
 

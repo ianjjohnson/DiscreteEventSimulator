@@ -10,6 +10,10 @@
 typedef struct message {
 
   char* content;
+
+  int flow_id;
+  int packet_number;
+
   int sender;
 
   int send_time;
@@ -25,10 +29,12 @@ typedef struct message_queue{
 
 } message_queue;
 
-message make_message(char* c, int s, int st, int at){
+message make_message(char* content, int s, int st, int at, int f_id, int p_no){
 
   message m;
-  m.content = c;
+  m.content = content;
+  m.flow_id = f_id;
+  m.packet_number = p_no;
   m.sender = s;
   m.send_time = st;
   m.arrive_time = at;

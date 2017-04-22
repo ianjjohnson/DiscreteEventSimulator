@@ -135,9 +135,9 @@ message top(message_queue* q){
 
 }
 
-void delete(message_queue* q){
+void delete_queue(message_queue q){
 
-  free(q->messages);
+  free(q.messages);
 
 }
 

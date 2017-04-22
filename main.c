@@ -33,12 +33,17 @@ int main(int argc, char* argv[]){
 
   client* clients = malloc(num_clients * sizeof(client));
 
+  controller sdn = make_controller(num_clients);
+
   startup(clients, num_clients);
 
   for(int i = 0; i < RUNTIME; i++)
     loop(clients, num_clients, i);
 
+  delete_clients(clients, num_clients);
   free(clients);
+
+  delete_controller(sdn);
 
   return 0;
 

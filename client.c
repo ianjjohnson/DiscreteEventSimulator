@@ -43,6 +43,13 @@ void process_messages_for_time(client* clients, int client_id, int time){
 
 }
 
+void delete_clients(client* clients, int num_clients){
+
+  for(int i = 0; i < num_clients; i++)
+    delete_queue(clients[i].queue);
+
+}
+
 
 
 #endif

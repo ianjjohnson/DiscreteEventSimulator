@@ -30,6 +30,10 @@ controller make_controller(int num_clients){
     c.adjacencies[i] = malloc(num_clients * sizeof(int));
     memset(c.adjacencies[i], 0, num_clients * sizeof(int));
 
+  }
+
+  for(int i = 0; i < num_clients; i++){
+
     int num_edges = 0;
 
     for(int j = 0; j < num_clients; j++){

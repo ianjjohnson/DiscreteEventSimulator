@@ -4,7 +4,7 @@
 #define CONTROLLER_H
 
 #define MAX_COST 100
-#define DENSITY 0.2
+#define DENSITY 0.4
 
 #include <time.h>
 #include <stdlib.h>
@@ -58,6 +58,22 @@ controller make_controller(int num_clients){
   }
 
   return c;
+
+}
+
+void print_adjacencies(controller* c){
+
+  int space = 3;
+
+  printf("Adjacency Matrix:");
+  for(int i = 0; i < c->num_clients; i++){
+    printf("\n[");
+    for(int j = 0; j < c->num_clients; j++){
+      printf("%*d,", space, c->adjacencies[i][j]);
+    }
+    printf("\b]");
+  }
+  printf("\n");
 
 }
 

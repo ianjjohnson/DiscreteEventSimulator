@@ -34,6 +34,7 @@ int main(int argc, char* argv[]){
   client* clients = malloc(num_clients * sizeof(client));
 
   controller sdn = make_controller(num_clients);
+  print_adjacencies(&sdn);
 
   startup(clients, num_clients);
 

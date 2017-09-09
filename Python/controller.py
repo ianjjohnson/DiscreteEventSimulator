@@ -1,11 +1,24 @@
 import random
 from message import Message
+from node import Node
 
-class Controller(object):
+class Controller(Node):
     def __init__(self, logfile):
         self.nodes = {}
         self.logfile = logfile
-        self.message_id_counter = 0
+        self.inbox = []
+        self.outbox = []
+        self.controller = self
+        self.last_receive = 0
+        self.time = -1
+        self.id = -1
+
+    def iterate(self, time):
+        for index, node in self.nodes.items():
+            node.process_inbox_at_time(time)
+            node.process_outbox_at_time(time)
+        self.process_inbox_at_time(time)
+        self.process_outbox_at_time(time)
 
     def register(self, node):
         self.nodes[node.id] = node
@@ -22,9 +35,14 @@ class Controller(object):
                 self.nodes[i].add_neighbor(self.nodes[j])
                 self.nodes[j].add_neighbor(self.nodes[i])
 
-    def send_message_to_every_node(self, message):
-        for node in self.nodes.values():
-            node.inbox_message(message)
+    def process_message(self, message):
+        if message.source != self.id:
+            self.logfile.write("Message with ID " + str(message.uid) + " received by node "
+                               + str(self.id) + ":\n\t" + str(message.contents) + "\n\t"
+                               + "sender: " + str(message.source) + "\n")
+
+        if 'request' in message.contents:
+            self.update_routes_for_packet(message.contents['request'])
 
     def write_network_to_file(self, filename):
         output_file = open(filename, 'w')
@@ -34,14 +52,20 @@ class Controller(object):
             output_file.write(" ".join(",".join([str(x), str(y)]) for x , y in node.neighbors.items()) + "\n")
         output_file.close()
 
+    def get_node(self, nodeid):
+        if nodeid == self.id:
+            return self
+        return self.nodes[nodeid]
+
     def update_routes_for_packet(self, message):
 
-        for current in self.nodes.keys():
+        for source in self.nodes.keys():
 
             unvisited = {node: None for node in self.nodes.keys()} # None = +inf
             visited = {}
             path = {}
             current_distance = 0
+            current = source
             unvisited[current] = current_distance
 
             while True:
@@ -57,6 +81,14 @@ class Controller(object):
                 candidates = [node for node in unvisited.items() if node[1]]
                 current, current_distance = sorted(candidates, key = lambda x: x[1])[0]
 
-            routing_message = Message(self.message_id_counter, {"routing": path}, 0, current)
+            if source != message.destination:
+                path = {message.uid : path[message.destination]}
+            else:
+                path = {}
+
+            routing_message = Message({"routing": path}, 0, source, source, self.time, 1)
             for node in self.nodes.keys():
-                self.nodes[node].inbox_message(routing_message)
+                self.outbox.append((node, routing_message))
+
+        flow_msg = Message({'flow':message}, self.id, message.source, message.source, self.time, 1)
+        self.outbox.append((message.source, flow_msg))

@@ -16,10 +16,15 @@ for graph_line in graph_serialied[:-1]:
     items = graph_line.split(" ")
     node.Node(controller, items[0], items[1], items[2:])
 
-controller.write_network_to_file("network.dat")
+# controller.write_network_to_file("network.dat")
 
-msg = message.Message("test", 1000, 1, 2)
-controller.update_routes_for_packet(msg)
+msg = message.Message({"body":"tests"}, 0, 0, 1, -1, 10)
+controller.get_node(0).send_message(msg, -1)
+
+for time in range(50):
+    logfile.write("### Beginning Iteration " + str(time) + " ###\n")
+    controller.iterate(time)
+
 # Format:
 # TYPE ID NEIGHBORS (neighbor,distance neighbor,distance)
 # NODE 1 2 3 4

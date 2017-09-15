@@ -57,7 +57,7 @@ class Controller(Node):
             return self
         return self.nodes[nodeid]
 
-    def update_routes_for_packet(self, message):
+    def update_routes_for_packet(self, message, sdn=True):
 
         for source in self.nodes.keys():
 
@@ -79,16 +79,21 @@ class Controller(Node):
                 del unvisited[current]
                 if not unvisited: break
                 candidates = [node for node in unvisited.items() if node[1]]
+                if len(candidates) == 0: break
                 current, current_distance = sorted(candidates, key = lambda x: x[1])[0]
 
-            if source != message.destination:
-                path = {message.uid : path[message.destination]}
-            else:
-                path = {}
+            if sdn:
+                if source != message.destination:
+                    path = {message.uid : path[message.destination]}
+                else:
+                    path = {}
 
-            routing_message = Message({"routing": path}, 0, source, source, self.time, 1)
-            for node in self.nodes.keys():
-                self.outbox.append((node, routing_message))
+                routing_message = Message({"routing": path}, 0, source, source, self.time, 1)
+                #for node in self.nodes.keys():
+                #    self.outbox.append((node, routing_message))
+                self.outbox.append((source, routing_message))
+            else:
+                self.nodes[source].update_routing_table(path)
 
         flow_msg = Message({'flow':message}, self.id, message.source, message.source, self.time, 1)
         self.outbox.append((message.source, flow_msg))

@@ -2,7 +2,7 @@ from message import Message
 import copy
 
 class Node(object):
-    def __init__(self, controller, node_type, uid, neighbors):
+    def __init__(self, controller, node_type, uid, neighbors, SDN):
         self.position = (0,0,0)
         self.neighbors = dict([tuple([int(a) for a in x.split(",")]) for x in neighbors])
         self.inbox = []
@@ -14,6 +14,7 @@ class Node(object):
         self.logfile = None # register will change this
         self.last_receive = -1
         self.time = 0
+        self.SDN = SDN
         controller.register(self)
 
     def inbox_message(self, message, send_time):
@@ -66,14 +67,15 @@ class Node(object):
             self.route_message(copy.copy(message))
 
     def route_message(self, message):
-        if message.uid not in self.routing_table:
+        key = message.uid if self.SDN else message.destination
+        if key not in self.routing_table:
             if message.destination == self.id:
                 self.logfile.write("Message with ID " + str(message.uid) + " arrived at destination node " + str(self.id) + ".\n")
             else:
                 self.logfile.write("ERROR: No routing information for target: " + str(message.destination)
                                + " at node " + str(self.id))
             return
-        next_hop = self.routing_table[message.uid]
+        next_hop = self.routing_table[key]
         if (next_hop == self.id):
             next_hop = message.destination
         message.recipient = next_hop
@@ -87,5 +89,8 @@ class Node(object):
         self.neighbors.append(node)
 
     def send_message(self, message, time):
-        msg = Message({'request':message}, self.id, -1, -1, time, 1)
-        self.outbox.append((-1, msg))
+        if self.SDN:
+            msg = Message({'request':message}, self.id, -1, -1, time, 1)
+            self.outbox.append((-1, msg))
+        else:
+            self.route_message(message)

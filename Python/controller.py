@@ -105,7 +105,6 @@ class Controller(Node):
                 #for node in self.nodes.keys():
                 #    self.outbox.append((node, routing_message))
                 self.route_message(routing_message)
-                self.outbox.append((source, routing_message))
             else:
                 self.nodes[source].update_routing_table(path)
 

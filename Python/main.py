@@ -4,7 +4,7 @@ import message
 import random
 
 MEAN_NEIGHBORS_PER_NODE = 5 # on average, this is 3-4 for mesh
-NUMBER_OF_NODES = 10
+NUMBER_OF_NODES = 50
 NUM_ITERATIONS = 1000
 MAX_PACKETS_PER_FLOW = 5
 MAX_COST = 10

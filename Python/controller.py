@@ -3,7 +3,7 @@ from message import Message
 from node import Node
 
 class Controller(Node):
-    def __init__(self, logfile):
+    def __init__(self, logfile, one_hop, controller_id = 1000001, sdn=True):
         self.nodes = {}
         self.logfile = logfile
         self.inbox = []
@@ -11,7 +11,12 @@ class Controller(Node):
         self.controller = self
         self.last_receive = 0
         self.time = -1
-        self.id = -1
+        self.id = controller_id
+        self.controller_id = controller_id
+        self.one_hop = one_hop
+        self.type = "Controller"
+        self.SDN = sdn
+        self.routing_table = {}
 
     def iterate(self, time):
         for index, node in self.nodes.items():
@@ -23,6 +28,8 @@ class Controller(Node):
     def register(self, node):
         self.nodes[node.id] = node
         node.logfile = self.logfile
+        if self.one_hop:
+            self.routing_table[node.id] = node.id
 
     def assign_neighbors(self, mean_neighbors_per_node):
         num_nodes = len(self.nodes)
@@ -34,6 +41,9 @@ class Controller(Node):
                     j = int(random.random() * num_nodes)
                 self.nodes[i].add_neighbor(self.nodes[j])
                 self.nodes[j].add_neighbor(self.nodes[i])
+
+    def controller_route_message(self, message, target):
+        self.outbox.append((target, message))
 
     def process_message(self, message):
         if message.source != self.id:
@@ -47,19 +57,22 @@ class Controller(Node):
     def write_network_to_file(self, filename):
         output_file = open(filename, 'w')
         for node in self.nodes.values():
+            if node.type == "Controller": continue
             output_file.write(node.type)
             output_file.write(" " + str(node.id) + " ")
             output_file.write(" ".join(",".join([str(x), str(y)]) for x , y in node.neighbors.items()) + "\n")
         output_file.close()
 
     def get_node(self, nodeid):
-        if nodeid == self.id:
+        if nodeid == -1:
             return self
         return self.nodes[nodeid]
 
     def update_routes_for_packet(self, message, sdn=True):
 
         for source in self.nodes.keys():
+
+            if source == self.id and self.one_hop: continue
 
             unvisited = {node: None for node in self.nodes.keys()} # None = +inf
             visited = {}
@@ -88,12 +101,14 @@ class Controller(Node):
                 else:
                     path = {}
 
-                routing_message = Message({"routing": path}, 0, source, source, self.time, 1)
+                routing_message = Message({"routing": path}, 0, source, source, self.time, 1, True)
                 #for node in self.nodes.keys():
                 #    self.outbox.append((node, routing_message))
+                self.route_message(routing_message)
                 self.outbox.append((source, routing_message))
             else:
                 self.nodes[source].update_routing_table(path)
 
-        flow_msg = Message({'flow':message}, self.id, message.source, message.source, self.time, 1)
-        self.outbox.append((message.source, flow_msg))
+        flow_msg = Message({'flow':message}, self.id, message.source, message.source, self.time, 1, True)
+        if 'init' not in message.contents:
+            self.route_message(flow_msg)

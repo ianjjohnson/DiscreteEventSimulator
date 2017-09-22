@@ -7,9 +7,13 @@ class Node(object):
         self.neighbors = dict([tuple([int(a) for a in x.split(",")]) for x in neighbors])
         self.inbox = []
         self.outbox = []
+        self.outbox_timing = {}
         self.routing_table = {}
+        if controller.one_hop:
+            self.routing_table[controller.id] = controller.id
         self.id = int(uid)
         self.controller = controller
+        self.controller_id = controller.id
         self.type = node_type
         self.logfile = None # register will change this
         self.last_receive = -1
@@ -31,7 +35,7 @@ class Node(object):
             if message.last_send >= time:
                 continue
             del self.inbox[index]
-            if self.id == message.recipient:
+            if self.id == message.recipient or message.is_sdn_control:
                 self.process_message(message)
             else:
                 self.logfile.write("Message with ID " + str(message.uid) +
@@ -45,6 +49,10 @@ class Node(object):
                 self.logfile.write("Message with ID " + str(message.uid) +
                                    " sent by node " + str(self.id) + " to node "
                                    + str(next_hop) + ".\n")
+                if self.id != self.controller_id and message.uid in self.outbox_timing:
+                    delta = time - self.outbox_timing[message.uid]
+                    self.logfile.write("E2E Time Delta: " + str(delta) + "\n")
+                    del self.outbox_timing[message.uid]
                 del self.outbox[index]
                 break
 
@@ -55,10 +63,9 @@ class Node(object):
 
         if 'flow' in message.contents:
             self.add_flow_to_outbox(message.contents['flow'])
-        if 'routing' in message.contents:
+        if 'routing' in message.contents and message.destination == self.id:
             self.update_routing_table(message.contents['routing'])
-        if 'body' in message.contents:
-            self.route_message(message)
+        self.route_message(message)
 
     def add_flow_to_outbox(self, message):
         flowsize = message.flowsize
@@ -68,12 +75,15 @@ class Node(object):
 
     def route_message(self, message):
         key = message.uid if self.SDN else message.destination
+        if message.is_sdn_control:
+            key = message.destination
         if key not in self.routing_table:
             if message.destination == self.id:
                 self.logfile.write("Message with ID " + str(message.uid) + " arrived at destination node " + str(self.id) + ".\n")
             else:
-                self.logfile.write("ERROR: No routing information for target: " + str(message.destination)
-                               + " at node " + str(self.id))
+                self.logfile.write("ERROR: No routing information for key: " + str(key)
+                               + " at node " + str(self.id) + "\n")
+                print("ERROR", self.id, message.destination, key, self.routing_table)
             return
         next_hop = self.routing_table[key]
         if (next_hop == self.id):
@@ -90,7 +100,8 @@ class Node(object):
 
     def send_message(self, message, time):
         if self.SDN:
-            msg = Message({'request':message}, self.id, -1, -1, time, 1)
-            self.outbox.append((-1, msg))
+            msg = Message({'request':message}, self.id, self.controller_id, self.controller_id, time, 1, True)
+            self.route_message(msg)
+            self.outbox_timing[message.uid] = time
         else:
-            self.route_message(message)
+            self.add_flow_to_outbox(message)

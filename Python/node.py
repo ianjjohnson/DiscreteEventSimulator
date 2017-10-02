@@ -54,7 +54,7 @@ class Node(object):
                     self.logfile.write("Wait time: " + str(delta) + "\n")
                     message.msg_data['wait_time'].append(delta)
                     if not message.is_sdn_control:
-                        message.msg_data['arrival'][message.uid] = self.time
+                        message.msg_data['arrival'][message.uid] = time
                     del self.outbox_timing[message.uid]
                 del self.outbox[index]
                 break

@@ -21,6 +21,7 @@ class Controller(Node):
     def iterate(self, time):
         for index, node in self.nodes.items():
             node.process_inbox_at_time(time)
+        for index, node in self.nodes.items():
             node.process_outbox_at_time(time)
         self.process_inbox_at_time(time)
         self.process_outbox_at_time(time)

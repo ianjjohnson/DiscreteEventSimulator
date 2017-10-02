@@ -92,6 +92,8 @@ print(msg_data['travel_time'])
 print("Mean: " + str(np.mean(msg_data['travel_time'])))
 print("Standard Deviation: " + str(np.std(msg_data['travel_time'])))
 
+print("Mean number of neighbors: " + str(np.mean([len(x.neighbors) for x in controller.nodes.values() if x != controller])))
+
 # Format:
 # TYPE ID NEIGHBORS (neighbor,distance neighbor,distance)
 # NODE 1 2 3 4

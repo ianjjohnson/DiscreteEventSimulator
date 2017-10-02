@@ -51,7 +51,10 @@ class Node(object):
                                    + str(next_hop) + ".\n")
                 if self.id != self.controller_id and message.uid in self.outbox_timing:
                     delta = time - self.outbox_timing[message.uid]
-                    self.logfile.write("E2E Time Delta: " + str(delta) + "\n")
+                    self.logfile.write("Wait time: " + str(delta) + "\n")
+                    message.msg_data['wait_time'].append(delta)
+                    if not message.is_sdn_control:
+                        message.msg_data['arrival'][message.uid] = self.time
                     del self.outbox_timing[message.uid]
                 del self.outbox[index]
                 break
@@ -65,7 +68,8 @@ class Node(object):
             self.add_flow_to_outbox(message.contents['flow'])
         if 'routing' in message.contents and message.destination == self.id:
             self.update_routing_table(message.contents['routing'])
-        self.route_message(message)
+        if not self.route_message(message):
+            self.inbox.append(message)
 
     def add_flow_to_outbox(self, message):
         flowsize = message.flowsize
@@ -80,16 +84,20 @@ class Node(object):
         if key not in self.routing_table:
             if message.destination == self.id:
                 self.logfile.write("Message with ID " + str(message.uid) + " arrived at destination node " + str(self.id) + ".\n")
+                if not message.is_sdn_control and message.uid in message.msg_data['arrival']:
+                    message.msg_data['travel_time'].append(self.time - message.msg_data['arrival'][message.uid])
+                    del message.msg_data['arrival'][message.uid]
             else:
                 self.logfile.write("ERROR: No routing information for key: " + str(key)
-                               + " at node " + str(self.id) + "\n")
-                print("ERROR", self.id, message.destination, key, self.routing_table)
-            return
+                               + " at node " + str(self.id) + ". Returning to inbox. This is a transient error.\n")
+                return False
+            return True
         next_hop = self.routing_table[key]
         if (next_hop == self.id):
             next_hop = message.destination
         message.recipient = next_hop
         self.outbox.append((next_hop, message))
+        return True
 
     def update_routing_table(self, routing_table):
         for key, value in routing_table.items():
@@ -99,9 +107,9 @@ class Node(object):
         self.neighbors.append(node)
 
     def send_message(self, message, time):
+        self.outbox_timing[message.uid] = time
         if self.SDN:
             msg = Message({'request':message}, self.id, self.controller_id, self.controller_id, time, 1, True)
             self.route_message(msg)
-            self.outbox_timing[message.uid] = time
         else:
             self.add_flow_to_outbox(message)

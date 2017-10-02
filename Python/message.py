@@ -1,5 +1,5 @@
 class Message(object):
-    def __init__(self, contents, source, recipient, destination, last_send, flowsize, is_sdn_control):
+    def __init__(self, contents, source, recipient, destination, last_send, flowsize, is_sdn_control, msg_data = {}):
         self.source = source
         self.recipient = recipient
         self.destination = destination
@@ -9,6 +9,8 @@ class Message(object):
         self.uid = hash(str([self.source, self.destination, self.contents, self.type]))
         self.flowsize = flowsize
         self.is_sdn_control = is_sdn_control
+        self.creation_time = last_send
+        self.msg_data = msg_data
 
     def send(self, recipients):
         for recipient in recipients:

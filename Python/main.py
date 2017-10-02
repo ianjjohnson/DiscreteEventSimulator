@@ -2,10 +2,12 @@ import controller
 import node
 import message
 import random
+import math
 
+lambda_ = 5 # Lambda for exponential distribution
 MEAN_NEIGHBORS_PER_NODE = 5 # on average, this is 3-4 for mesh
 NUMBER_OF_NODES = 50
-NUM_ITERATIONS = 1000
+NUM_ITERATIONS = 10000
 MAX_PACKETS_PER_FLOW = 5
 MAX_COST = 10
 READ_GRAPH = False
@@ -28,7 +30,7 @@ def generate_network(c):
                     or abs(x-i) == 1]
         neighborstring = "Node " + str(i)
         for n in neighbors:
-            neighborstring = neighborstring + " " + str(n) + "," + str(int(random.random()*MAX_COST))
+            neighborstring = neighborstring + " " + str(n) + "," + "1"#str(int(random.random()*MAX_COST) + 1)
         items = neighborstring.split(" ")
         node.Node(c, items[0], items[1], items[2:], SDN)
 
@@ -49,16 +51,17 @@ else:
 controller.register(controller)
 controller.write_network_to_file("graph.dat")
 
-msg = message.Message({"init":"test"}, 0, 0, 1, -1, 1, False)
-controller.update_routes_for_packet(msg, sdn=False)
-
-for nodeid, node in controller.nodes.items():
-    print(nodeid, node.routing_table)
+#for nodeid, node in controller.nodes.items():
+#    print(nodeid, node.routing_table)
 
 #msg = message.Message({"body":"tests"}, 0, 0, 1, -1, 1)
 #controller.get_node(0).send_message(msg, -1)
 
 msg_num = 0
+msg_data = {'wait_time' : [], 'arrival': {}, 'travel_time': []}
+
+msg = message.Message({"init":"test"}, 0, 0, 1, -1, 1, False)
+controller.update_routes_for_packet(msg, sdn=False)
 
 def init_message(time):
     global msg_num
@@ -67,7 +70,7 @@ def init_message(time):
     while destination == source:
         destination = int(random.random()*NUMBER_OF_NODES)
     flow_size = int(random.random()*MAX_PACKETS_PER_FLOW)
-    msg = message.Message({"body":str(msg_num)}, source, source, destination, time, flow_size, False)
+    msg = message.Message({"body":str(msg_num)}, source, source, destination, time, flow_size, False, msg_data)
     controller.get_node(source).send_message(msg, time)
     msg_num = msg_num + 1
 
@@ -75,8 +78,19 @@ for time in range(NUM_ITERATIONS):
     logfile.write("### Beginning Iteration " + str(time) + " ###\n")
     controller.iterate(time)
 
-    if time%50 == 0:
+    if random.expovariate(lambda_) > 1:
         init_message(time)
+
+import numpy as np
+print("Wait Time: " + str(len(msg_data['wait_time'])))
+print(msg_data['wait_time'])
+print("Mean: " + str(np.mean(msg_data['wait_time'])))
+print("Standard Deviation: " + str(np.std(msg_data['wait_time'])))
+
+print("Travel Time: " + str(len(msg_data['travel_time'])))
+print(msg_data['travel_time'])
+print("Mean: " + str(np.mean(msg_data['travel_time'])))
+print("Standard Deviation: " + str(np.std(msg_data['travel_time'])))
 
 # Format:
 # TYPE ID NEIGHBORS (neighbor,distance neighbor,distance)

@@ -2,7 +2,7 @@ from message import Message
 import copy
 
 class Node(object):
-    def __init__(self, controller, node_type, uid, neighbors, SDN):
+    def __init__(self, controller, node_type, uid, neighbors, SDN, SDN_STRATEGY):
         self.position = (0,0,0)
         self.neighbors = dict([tuple([int(a) for a in x.split(",")]) for x in neighbors])
         self.inbox = []
@@ -19,6 +19,9 @@ class Node(object):
         self.last_receive = -1
         self.time = 0
         self.SDN = SDN
+        self.floodmap = {}
+        self.mst_edges = []
+        self.sdn_strategy = SDN_STRATEGY
         controller.register(self)
 
     def inbox_message(self, message, send_time):
@@ -35,14 +38,13 @@ class Node(object):
             if message.last_send >= time:
                 continue
             del self.inbox[index]
-            if self.id == message.recipient or message.is_sdn_control:
+            if self.id == message.recipient or message.is_sdn_control or self.sdn_strategy in ["BROADCAST", "FLOOD", "GATEWAY"]:
                 self.process_message(message)
             else:
                 self.logfile.write("Message with ID " + str(message.uid) +
                                    " ignored by node " + str(self.id) + "\n")
 
     def process_outbox_at_time(self, time):
-        index = 0
         for index in range(len(self.outbox)):
             next_hop, message = self.outbox[index]
             if self.controller.get_node(next_hop).inbox_message(message, self.time):
@@ -57,12 +59,16 @@ class Node(object):
                         message.msg_data['arrival'][message.uid] = time
                     del self.outbox_timing[message.uid]
                 del self.outbox[index]
-                break
+                return
 
     def process_message(self, message):
         self.logfile.write("Message with ID " + str(message.uid) + " received by node "
                            + str(self.id) + ":\n\t" + str(message.contents) + "\n\t"
                            + "sender: " + str(message.source) + "\n")
+
+        if self.SDN and self.sdn_strategy in ["BROADCAST", "FLOOD"]:
+            self.broadcast_message(message)
+            return
 
         if 'flow' in message.contents:
             self.add_flow_to_outbox(message.contents['flow'])
@@ -74,8 +80,37 @@ class Node(object):
     def add_flow_to_outbox(self, message):
         flowsize = message.flowsize
         message.flowsize = 1
-        for _ in range(flowsize):
-            self.route_message(copy.copy(message))
+        for i in range(flowsize):
+            if self.SDN:
+                if self.sdn_strategy in ["BROADCAST", "FLOOD"]:
+                    tmp = copy.copy(message)
+                    tmp.flow_num = i
+                    self.broadcast_message(tmp)
+                elif self.sdn_strategy == "GATEWAY":
+                    self.outbox.append((self.controller_id, message))
+                elif self.sdn_strategy == "ROUTE":
+                    self.route_message(copy.copy(message))
+            else:
+                self.route_message(copy.copy(message))
+
+    def broadcast_message(self, message):
+        if self.id == message.destination:
+            self.arrive(message)
+            return
+        if (message.uid, message.flow_num) in self.floodmap:
+            return
+        sender = message.broadcast_sender
+        message.broadcast_sender = self.id
+        for n in (self.mst_edges if self.sdn_strategy == "BROADCAST" else self.neighbors):
+            if n != sender and n != self.id:
+                self.outbox.append((n, message))
+        self.floodmap[(message.uid, message.flow_num)] = 1
+
+    def arrive(self, message):
+        self.logfile.write("Message with ID " + str(message.uid) + " arrived at destination node " + str(self.id) + ".\n")
+        if not message.is_sdn_control and message.uid in message.msg_data['arrival']:
+            message.msg_data['travel_time'].append(self.time - message.msg_data['arrival'][message.uid])
+            del message.msg_data['arrival'][message.uid]
 
     def route_message(self, message):
         key = message.uid if self.SDN else message.destination
@@ -83,10 +118,7 @@ class Node(object):
             key = message.destination
         if key not in self.routing_table:
             if message.destination == self.id:
-                self.logfile.write("Message with ID " + str(message.uid) + " arrived at destination node " + str(self.id) + ".\n")
-                if not message.is_sdn_control and message.uid in message.msg_data['arrival']:
-                    message.msg_data['travel_time'].append(self.time - message.msg_data['arrival'][message.uid])
-                    del message.msg_data['arrival'][message.uid]
+                self.arrive(message)
             else:
                 self.logfile.write("ERROR: No routing information for key: " + str(key)
                                + " at node " + str(self.id) + ". Returning to inbox. This is a transient error.\n")
@@ -109,7 +141,10 @@ class Node(object):
     def send_message(self, message, time):
         self.outbox_timing[message.uid] = time
         if self.SDN:
-            msg = Message({'request':message}, self.id, self.controller_id, self.controller_id, time, 1, True)
-            self.route_message(msg)
+            if self.sdn_strategy == "ROUTE":
+                msg = Message({'request':message}, self.id, self.controller_id, self.controller_id, time, 1, True)
+                self.route_message(msg)
+            elif self.sdn_strategy in ["BROADCAST", "FLOOD", "GATEWAY"]:
+                self.add_flow_to_outbox(message)
         else:
             self.add_flow_to_outbox(message)

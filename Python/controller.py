@@ -3,7 +3,7 @@ from message import Message
 from node import Node
 
 class Controller(Node):
-    def __init__(self, logfile, one_hop, controller_id = 1000001, sdn=True):
+    def __init__(self, logfile, one_hop, controller_id = 1000001, sdn=True, SDN_STRATEGY="ROUTE"):
         self.nodes = {}
         self.logfile = logfile
         self.inbox = []
@@ -17,14 +17,14 @@ class Controller(Node):
         self.type = "Controller"
         self.SDN = sdn
         self.routing_table = {}
+        self.mst_edges = []
+        self.sdn_strategy = SDN_STRATEGY
 
     def iterate(self, time):
         for index, node in self.nodes.items():
             node.process_inbox_at_time(time)
         for index, node in self.nodes.items():
             node.process_outbox_at_time(time)
-        self.process_inbox_at_time(time)
-        self.process_outbox_at_time(time)
 
     def register(self, node):
         self.nodes[node.id] = node
@@ -52,7 +52,9 @@ class Controller(Node):
                                + str(self.id) + ":\n\t" + str(message.contents) + "\n\t"
                                + "sender: " + str(message.source) + "\n")
 
-        if 'request' in message.contents:
+        if self.sdn_strategy == "GATEWAY":
+            self.outbox.append((message.destination, message))
+        elif 'request' in message.contents:
             self.update_routes_for_packet(message.contents['request'])
 
     def write_network_to_file(self, filename):

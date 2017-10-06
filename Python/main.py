@@ -5,19 +5,27 @@ import random
 import math
 
 lambda_ = 5 # Lambda for exponential distribution
-MEAN_NEIGHBORS_PER_NODE = 5 # on average, this is 3-4 for mesh
+MEAN_NEIGHBORS_PER_NODE = 4 # on average, this is 3-4 for mesh
 NUMBER_OF_NODES = 50
-NUM_ITERATIONS = 10000
+NUM_ITERATIONS = 1000
 MAX_PACKETS_PER_FLOW = 5
 MAX_COST = 10
 READ_GRAPH = False
-SDN = True
-ONE_HOP_CONTROLLER = True
+SDN = False
+SDN_STRATEGY = "GATEWAY" # "FLOOD", "BROADCAST", "ROUTE", "GATEWAY"
+ONE_HOP_CONTROLLER = False
+
+if(SDN_STRATEGY == "BROADCAST"):
+    ONE_HOP_CONTROLLER = False
+elif SDN_STRATEGY == "GATEWAY":
+    ONE_HOP_CONTROLLER = True
 
 logfile = open('sdn.dat' if SDN else 'net.dat', 'w')
-controller = controller.Controller(logfile, ONE_HOP_CONTROLLER, NUMBER_OF_NODES, SDN)
+controller = controller.Controller(logfile, ONE_HOP_CONTROLLER, NUMBER_OF_NODES, SDN, SDN_STRATEGY)
 
-if not ONE_HOP_CONTROLLER:
+if ONE_HOP_CONTROLLER:
+    controller.neighbors = {}
+else:
     controller.neighbors = {}
     for i in range(NUMBER_OF_NODES):
         if random.random() < ((MEAN_NEIGHBORS_PER_NODE-2)/NUMBER_OF_NODES):
@@ -32,7 +40,7 @@ def generate_network(c):
         for n in neighbors:
             neighborstring = neighborstring + " " + str(n) + "," + "1"#str(int(random.random()*MAX_COST) + 1)
         items = neighborstring.split(" ")
-        node.Node(c, items[0], items[1], items[2:], SDN)
+        node.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY)
 
 
 if(READ_GRAPH):
@@ -42,7 +50,7 @@ if(READ_GRAPH):
     graph_input.close()
     for graph_line in graph_serialied[:-1]:
         items = graph_line.split(" ")
-        node.Node(controller, items[0], items[1], items[2:], SDN)
+        node.Node(controller, items[0], items[1], items[2:], SDN, SDN_STRATEGY)
 
 else:
 
@@ -51,8 +59,23 @@ else:
 controller.register(controller)
 controller.write_network_to_file("graph.dat")
 
-#for nodeid, node in controller.nodes.items():
-#    print(nodeid, node.routing_table)
+# Computer Minimum Spanning Tree
+if SDN_STRATEGY == "BROADCAST":
+    X = [0,1] # The nodes in the MST
+    controller.get_node(0).mst_edges.append(1)
+    controller.get_node(1).mst_edges.append(0)
+    controller_id = controller.get_node(0).controller_id
+    index = 0
+    while(len(X) != NUMBER_OF_NODES + 1):
+        for n in controller.get_node(index).neighbors:
+            if n not in X:
+                controller.get_node(index).mst_edges.append(n)
+                controller.get_node(n).mst_edges.append(index)
+                X.append(n)
+        index = index + 1
+
+for nodeid, node in controller.nodes.items():
+    print(nodeid, node.neighbors, node.mst_edges)
 
 #msg = message.Message({"body":"tests"}, 0, 0, 1, -1, 1)
 #controller.get_node(0).send_message(msg, -1)
@@ -82,6 +105,9 @@ for time in range(NUM_ITERATIONS):
         init_message(time)
 
 import numpy as np
+
+print("Number of messages: " + str(msg_num))
+
 print("Wait Time: " + str(len(msg_data['wait_time'])))
 print(msg_data['wait_time'])
 print("Mean: " + str(np.mean(msg_data['wait_time'])))

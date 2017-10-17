@@ -4,15 +4,16 @@ import message
 import random
 import math
 
-lambda_ = 5 # Lambda for exponential distribution
-MEAN_NEIGHBORS_PER_NODE = 4 # on average, this is 3-4 for mesh
-NUMBER_OF_NODES = 50
-NUM_ITERATIONS = 1000
+lambda_ = 2 # Lambda for exponential distribution
+MEAN_NEIGHBORS_PER_NODE = 100 # on average, this is 3-4 for mesh
+NUMBER_OF_NODES = 30
+NUM_ITERATIONS = 10000
 MAX_PACKETS_PER_FLOW = 5
+UPTIME = 0.5
 MAX_COST = 10
 READ_GRAPH = False
-SDN = False
-SDN_STRATEGY = "GATEWAY" # "FLOOD", "BROADCAST", "ROUTE", "GATEWAY"
+SDN = True
+SDN_STRATEGY = "FLOOD" # "FLOOD", "BROADCAST", "ROUTE", "GATEWAY"
 ONE_HOP_CONTROLLER = False
 
 if(SDN_STRATEGY == "BROADCAST"):
@@ -21,7 +22,7 @@ elif SDN_STRATEGY == "GATEWAY":
     ONE_HOP_CONTROLLER = True
 
 logfile = open('sdn.dat' if SDN else 'net.dat', 'w')
-controller = controller.Controller(logfile, ONE_HOP_CONTROLLER, NUMBER_OF_NODES, SDN, SDN_STRATEGY)
+controller = controller.Controller(logfile, ONE_HOP_CONTROLLER, NUMBER_OF_NODES, SDN, SDN_STRATEGY, UPTIME)
 
 if ONE_HOP_CONTROLLER:
     controller.neighbors = {}
@@ -40,7 +41,7 @@ def generate_network(c):
         for n in neighbors:
             neighborstring = neighborstring + " " + str(n) + "," + "1"#str(int(random.random()*MAX_COST) + 1)
         items = neighborstring.split(" ")
-        node.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY)
+        node.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME)
 
 
 if(READ_GRAPH):
@@ -50,7 +51,7 @@ if(READ_GRAPH):
     graph_input.close()
     for graph_line in graph_serialied[:-1]:
         items = graph_line.split(" ")
-        node.Node(controller, items[0], items[1], items[2:], SDN, SDN_STRATEGY)
+        node.Node(controller, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME)
 
 else:
 
@@ -74,25 +75,27 @@ if SDN_STRATEGY == "BROADCAST":
                 X.append(n)
         index = index + 1
 
-for nodeid, node in controller.nodes.items():
-    print(nodeid, node.neighbors, node.mst_edges)
+
+#for nodeid, node in controller.nodes.items():
+#    print(nodeid, node.neighbors, node.mst_edges)
 
 #msg = message.Message({"body":"tests"}, 0, 0, 1, -1, 1)
 #controller.get_node(0).send_message(msg, -1)
 
 msg_num = 0
-msg_data = {'wait_time' : [], 'arrival': {}, 'travel_time': []}
+msg_data = {'wait_time' : [], 'arrival': {}, 'travel_time': [], 'overhead_nodes': 0}
 
 msg = message.Message({"init":"test"}, 0, 0, 1, -1, 1, False)
 controller.update_routes_for_packet(msg, sdn=False)
 
 def init_message(time):
     global msg_num
+    global msg_data
     source = int(random.random()*NUMBER_OF_NODES)
     destination = source
     while destination == source:
         destination = int(random.random()*NUMBER_OF_NODES)
-    flow_size = int(random.random()*MAX_PACKETS_PER_FLOW)
+    flow_size = max(1, int(random.random()*MAX_PACKETS_PER_FLOW))
     msg = message.Message({"body":str(msg_num)}, source, source, destination, time, flow_size, False, msg_data)
     controller.get_node(source).send_message(msg, time)
     msg_num = msg_num + 1
@@ -109,12 +112,12 @@ import numpy as np
 print("Number of messages: " + str(msg_num))
 
 print("Wait Time: " + str(len(msg_data['wait_time'])))
-print(msg_data['wait_time'])
+# print(msg_data['wait_time'])
 print("Mean: " + str(np.mean(msg_data['wait_time'])))
 print("Standard Deviation: " + str(np.std(msg_data['wait_time'])))
 
 print("Travel Time: " + str(len(msg_data['travel_time'])))
-print(msg_data['travel_time'])
+# print(msg_data['travel_time'])
 print("Mean: " + str(np.mean(msg_data['travel_time'])))
 print("Standard Deviation: " + str(np.std(msg_data['travel_time'])))
 

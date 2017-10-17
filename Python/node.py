@@ -1,8 +1,9 @@
 from message import Message
+import random
 import copy
 
 class Node(object):
-    def __init__(self, controller, node_type, uid, neighbors, SDN, SDN_STRATEGY):
+    def __init__(self, controller, node_type, uid, neighbors, SDN, SDN_STRATEGY, uptime = 1.0):
         self.position = (0,0,0)
         self.neighbors = dict([tuple([int(a) for a in x.split(",")]) for x in neighbors])
         self.inbox = []
@@ -22,17 +23,21 @@ class Node(object):
         self.floodmap = {}
         self.mst_edges = []
         self.sdn_strategy = SDN_STRATEGY
+        self.uptime = uptime
+        self.awake = True
         controller.register(self)
 
     def inbox_message(self, message, send_time):
         if self.last_receive == self.time:
             return False
         message.last_send = send_time
-        self.inbox.append(message)
+        if self.awake:
+            self.inbox.append(message)
         self.last_receive = self.time
         return True
 
     def process_inbox_at_time(self, time):
+        self.awake = self.sdn_strategy != "FLOOD" or random.random() < self.uptime
         self.time = time
         for index, message in enumerate(self.inbox):
             if message.last_send >= time:

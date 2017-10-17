@@ -3,7 +3,7 @@ from message import Message
 from node import Node
 
 class Controller(Node):
-    def __init__(self, logfile, one_hop, controller_id = 1000001, sdn=True, SDN_STRATEGY="ROUTE"):
+    def __init__(self, logfile, one_hop, controller_id = 1000001, sdn=True, SDN_STRATEGY="ROUTE", UPTIME = 1.0):
         self.nodes = {}
         self.logfile = logfile
         self.inbox = []
@@ -19,6 +19,7 @@ class Controller(Node):
         self.routing_table = {}
         self.mst_edges = []
         self.sdn_strategy = SDN_STRATEGY
+        self.uptime = UPTIME
 
     def iterate(self, time):
         for index, node in self.nodes.items():

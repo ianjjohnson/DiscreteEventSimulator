@@ -5,11 +5,12 @@ import random
 import math
 
 lambda_ = 2 # Lambda for exponential distribution
-MEAN_NEIGHBORS_PER_NODE = 100 # on average, this is 3-4 for mesh
-NUMBER_OF_NODES = 30
-NUM_ITERATIONS = 10000
+NETWORK_ARCHITECTURE = "MESH" # "MESH", "ALBERTO"
+MEAN_NEIGHBORS_PER_NODE = 4 # on average, this is 3-4 for mesh
+NUMBER_OF_NODES = 10
+NUM_ITERATIONS = 50000
 MAX_PACKETS_PER_FLOW = 5
-UPTIME = 0.5
+UPTIME = 1
 MAX_COST = 10
 READ_GRAPH = False
 SDN = True
@@ -33,15 +34,47 @@ else:
             controller.neighbors[i] = int(random.random()*MAX_COST)
 
 def generate_network(c):
+    nbrs = [[] for _ in range(NUMBER_OF_NODES)]
     for i in range(NUMBER_OF_NODES):
-        neighbors = [x for x in range(NUMBER_OF_NODES + (0 if ONE_HOP_CONTROLLER else 1))
-                    if (x != i and random.random() < ((MEAN_NEIGHBORS_PER_NODE-2)/NUMBER_OF_NODES))
+        neighbors = nbrs[i]
+        newneighbors = [x for x in range(NUMBER_OF_NODES + (0 if ONE_HOP_CONTROLLER or SDN_STRATEGY in ["FLOOD", "BROADCAST"] else 1))
+                    if (x != i and random.random() < ((MEAN_NEIGHBORS_PER_NODE-1-len(neighbors))/NUMBER_OF_NODES))
                     or abs(x-i) == 1]
+        for j in newneighbors:
+            if(j < NUMBER_OF_NODES):
+                nbrs[j].append(i)
+        neighbors = neighbors + newneighbors
         neighborstring = "Node " + str(i)
         for n in neighbors:
             neighborstring = neighborstring + " " + str(n) + "," + "1"#str(int(random.random()*MAX_COST) + 1)
         items = neighborstring.split(" ")
         node.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME)
+
+def generate_network_alberto(c, m = 5):
+    num_connections = (m*m-m)/2.0
+    for i in range(m):
+        neighbors = [x for x in range(m) if x != i]
+        neighborstring = "Node " + str(i)
+        for n in neighbors:
+            neighborstring = neighborstring + " " + str(n) + "," + "1"#str(int(random.random()*MAX_COST) + 1)
+        items = neighborstring.split(" ")
+        node.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME)
+
+    for i in range(m, NUMBER_OF_NODES):
+        neighbors = []
+        while(len(neighbors) == 0):
+            for j in range(len(c.nodes)):
+                if random.random() <= (len(c.get_node(j).neighbors)/(num_connections) if num_connections != 0 else 1):
+                    neighbors.append(j)
+        for n in neighbors:
+            c.get_node(n).neighbors[i] = 1
+            num_connections = num_connections + 2
+        neighborstring = "Node " + str(i)
+        for n in neighbors:
+            neighborstring = neighborstring + " " + str(n) + "," + "1"#str(int(random.random()*MAX_COST) + 1)
+        items = neighborstring.split(" ")
+        node.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME)
+
 
 
 if(READ_GRAPH):
@@ -54,10 +87,13 @@ if(READ_GRAPH):
         node.Node(controller, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME)
 
 else:
+    if NETWORK_ARCHITECTURE == "MESH":
+        generate_network(controller)
+    elif NETWORK_ARCHITECTURE == "ALBERTO":
+        generate_network_alberto(controller)
 
-    generate_network(controller)
-
-controller.register(controller)
+if SDN_STRATEGY not in ["BROADCAST", "FLOOD"]:
+    controller.register(controller)
 controller.write_network_to_file("graph.dat")
 
 # Computer Minimum Spanning Tree
@@ -67,17 +103,16 @@ if SDN_STRATEGY == "BROADCAST":
     controller.get_node(1).mst_edges.append(0)
     controller_id = controller.get_node(0).controller_id
     index = 0
-    while(len(X) != NUMBER_OF_NODES + 1):
+    while(len(X) != NUMBER_OF_NODES):
         for n in controller.get_node(index).neighbors:
-            if n not in X:
+            if n not in X and n < NUMBER_OF_NODES:
                 controller.get_node(index).mst_edges.append(n)
                 controller.get_node(n).mst_edges.append(index)
                 X.append(n)
         index = index + 1
 
-
-#for nodeid, node in controller.nodes.items():
-#    print(nodeid, node.neighbors, node.mst_edges)
+for nodeid, node in controller.nodes.items():
+    print(nodeid, node.neighbors, node.mst_edges)
 
 #msg = message.Message({"body":"tests"}, 0, 0, 1, -1, 1)
 #controller.get_node(0).send_message(msg, -1)

@@ -3,7 +3,7 @@ from message import Message
 from node import Node
 
 class Controller(Node):
-    def __init__(self, logfile, one_hop, controller_id = 1000001, sdn=True, SDN_STRATEGY="ROUTE", UPTIME = 1.0, ASYNC_UPDATES = False):
+    def __init__(self, logfile, one_hop, controller_id = 1000001, sdn=True, SDN_STRATEGY="ROUTE", UPTIME = 1.0, ASYNC_UPDATES = False, PRE_APPROVE_ROUTES = False):
         self.nodes = {}
         self.logfile = logfile
         self.inbox = []
@@ -22,6 +22,7 @@ class Controller(Node):
         self.uptime = UPTIME
         self.async_updates = ASYNC_UPDATES
         self.routing_updates = []
+        self.pre_approve_routes = PRE_APPROVE_ROUTES
 
     def iterate(self, time):
         for index, node in self.nodes.items():
@@ -81,7 +82,7 @@ class Controller(Node):
             self.route_message(routing_message)
         self.routing_updates = [{} for _ in self.nodes.keys()]
 
-    def update_routes_for_packet(self, message, sdn=True):
+    def update_routes_for_packet(self, message, sdn=True, real_arrival=True):
 
         for source in self.nodes.keys():
 
@@ -114,6 +115,9 @@ class Controller(Node):
                 else:
                     path = {}
 
+                if not real_arrival:
+                    self.nodes[source].routing_table.update(path)
+                    continue
                 if not self.async_updates:
                     routing_message = Message({"routing": path}, 0, source, source, self.time, 1, True)
                     self.route_message(routing_message)
@@ -125,6 +129,7 @@ class Controller(Node):
             else:
                 self.nodes[source].update_routing_table(path)
 
-        flow_msg = Message({'flow':message}, self.id, message.source, message.source, self.time, 1, True)
-        if 'init' not in message.contents:
-            self.route_message(flow_msg)
+        if real_arrival:
+            flow_msg = Message({'flow':message}, self.id, message.source, message.source, self.time, 1, True)
+            if 'init' not in message.contents:
+                self.route_message(flow_msg)

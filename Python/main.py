@@ -4,11 +4,11 @@ import message
 import random
 import math
 
-lambda_ = 0.05 # Lambda for exponential distribution
+lambda_ = 0.2 # Lambda for exponential distribution
 NETWORK_ARCHITECTURE = "MESH" # "MESH", "ALBERTO"
 MEAN_NEIGHBORS_PER_NODE = 4 # on average, this is 3-4 for mesh
-NUMBER_OF_NODES = 10
-NUM_ITERATIONS = 10000
+NUMBER_OF_NODES = 50
+NUM_ITERATIONS = 2500
 MAX_PACKETS_PER_FLOW = 5
 UPTIME = 1
 MAX_COST = 10
@@ -17,7 +17,8 @@ SDN = True
 SDN_STRATEGY = "ROUTE" # "FLOOD", "BROADCAST", "ROUTE", "GATEWAY"
 ONE_HOP_CONTROLLER = False
 ASYNC_UPDATES = True
-ASYNC_UPDATE_RATE = 20
+ASYNC_UPDATE_RATE = 100
+PRE_APPROVE_ROUTES = True
 
 if(SDN_STRATEGY == "BROADCAST"):
     ONE_HOP_CONTROLLER = False
@@ -25,7 +26,7 @@ elif SDN_STRATEGY == "GATEWAY":
     ONE_HOP_CONTROLLER = True
 
 logfile = open('sdn.dat' if SDN else 'net.dat', 'w')
-controller = controller.Controller(logfile, ONE_HOP_CONTROLLER, NUMBER_OF_NODES, SDN, SDN_STRATEGY, UPTIME, ASYNC_UPDATES)
+controller = controller.Controller(logfile, ONE_HOP_CONTROLLER, NUMBER_OF_NODES, SDN, SDN_STRATEGY, UPTIME, ASYNC_UPDATES, PRE_APPROVE_ROUTES)
 
 if ONE_HOP_CONTROLLER:
     controller.neighbors = {}
@@ -50,7 +51,7 @@ def generate_network(c):
         for n in neighbors:
             neighborstring = neighborstring + " " + str(n) + "," + "1"#str(int(random.random()*MAX_COST) + 1)
         items = neighborstring.split(" ")
-        nd.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME)
+        nd.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME, PRE_APPROVE_ROUTES=PRE_APPROVE_ROUTES)
 
 def generate_network_alberto(c, m = 5):
     num_connections = (m*m-m)/2.0
@@ -60,7 +61,7 @@ def generate_network_alberto(c, m = 5):
         for n in neighbors:
             neighborstring = neighborstring + " " + str(n) + "," + "1"#str(int(random.random()*MAX_COST) + 1)
         items = neighborstring.split(" ")
-        nd.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME)
+        nd.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME, PRE_APPROVE_ROUTES=PRE_APPROVE_ROUTES)
 
     for i in range(m, NUMBER_OF_NODES):
         neighbors = []
@@ -75,7 +76,7 @@ def generate_network_alberto(c, m = 5):
         for n in neighbors:
             neighborstring = neighborstring + " " + str(n) + "," + "1"#str(int(random.random()*MAX_COST) + 1)
         items = neighborstring.split(" ")
-        nd.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME)
+        nd.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME, PRE_APPROVE_ROUTES=PRE_APPROVE_ROUTES)
 
 
 
@@ -98,8 +99,8 @@ if SDN_STRATEGY not in ["BROADCAST", "FLOOD"]:
     controller.register(controller)
 controller.write_network_to_file("graph.dat")
 
-# Computer Minimum Spanning Tree
-if SDN_STRATEGY == "BROADCAST":
+# Compute Minimum Spanning Tree
+if SDN_STRATEGY in ["BROADCAST"]:
     X = [0,1] # The nodes in the MST
     controller.get_node(0).mst_edges.append(1)
     controller.get_node(1).mst_edges.append(0)
@@ -134,7 +135,6 @@ def init_message(time):
 time_since_last_send = 0
 for time in range(NUM_ITERATIONS):
     logfile.write("### Beginning Iteration " + str(time) + " ###\n")
-    controller.iterate(time)
 
     if(ASYNC_UPDATES and time%ASYNC_UPDATE_RATE == 0 and time != 0):
         controller.perform_async_routing_update()
@@ -143,6 +143,7 @@ for time in range(NUM_ITERATIONS):
         init_message(time)
         time_since_last_send = 0
 
+    controller.iterate(time)
     time_since_last_send = time_since_last_send + 1
 
 import numpy as np
@@ -158,6 +159,11 @@ print("Travel Time: " + str(len(nd.msg_data['travel_time'])))
 # print(msg_data['travel_time'])
 print("Mean: " + str(np.mean(nd.msg_data['travel_time'])))
 print("Standard Deviation: " + str(np.std(nd.msg_data['travel_time'])))
+
+print(nd.msg_data['wait_time'])
+
+if PRE_APPROVE_ROUTES:
+    print("Pre approved: " + str(nd.msg_data['pre-approved']))
 
 print("Mean number of neighbors: " + str(np.mean([len(x.neighbors) for x in controller.nodes.values() if x != controller])))
 

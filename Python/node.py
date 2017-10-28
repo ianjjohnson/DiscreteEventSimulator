@@ -3,10 +3,10 @@ import random
 import copy
 
 msg_num = 0
-msg_data = {'wait_time' : [], 'arrival': {}, 'travel_time': [], 'overhead_nodes': 0}
+msg_data = {'wait_time' : [], 'arrival': {}, 'travel_time': [], 'overhead_nodes': 0, 'pre-approved': 0}
 
 class Node(object):
-    def __init__(self, controller, node_type, uid, neighbors, SDN, SDN_STRATEGY, uptime = 1.0):
+    def __init__(self, controller, node_type, uid, neighbors, SDN, SDN_STRATEGY, uptime = 1.0, PRE_APPROVE_ROUTES = False):
         self.position = (0,0,0)
         self.neighbors = dict([tuple([int(a) for a in x.split(",")]) for x in neighbors])
         self.inbox = []
@@ -28,6 +28,8 @@ class Node(object):
         self.sdn_strategy = SDN_STRATEGY
         self.uptime = uptime
         self.awake = True
+        self.pre_approve_routes = PRE_APPROVE_ROUTES
+        self.pending_new_route = {}
         controller.register(self)
 
     def inbox_message(self, message, send_time):
@@ -79,7 +81,14 @@ class Node(object):
             return
 
         if 'flow' in message.contents:
-            self.add_flow_to_outbox(message.contents['flow'])
+            if self.pre_approve_routes:
+                if message.contents['flow'].destination in self.pending_new_route.keys():
+                    self.add_flow_to_outbox(message.contents['flow'])
+                    self.pending_new_route[message.contents['flow'].destination] = self.pending_new_route[message.contents['flow'].destination] - 1
+                    if(self.pending_new_route[message.contents['flow'].destination] == 0):
+                        del self.pending_new_route[message.contents['flow'].destination]
+            else:
+                self.add_flow_to_outbox(message.contents['flow'])
         if 'routing' in message.contents and message.destination == self.id:
             self.update_routing_table(message.contents['routing'])
         if not self.route_message(message):
@@ -109,7 +118,7 @@ class Node(object):
             return
         sender = message.broadcast_sender
         message.broadcast_sender = self.id
-        for n in (self.mst_edges if self.sdn_strategy == "BROADCAST" else self.neighbors):
+        for n in (self.mst_edges if self.sdn_strategy in ["BROADCAST"] else self.neighbors):
             if n != sender and n != self.id:
                 self.outbox.append((n, message))
         self.floodmap[(message.uid, message.flow_num)] = 1
@@ -150,6 +159,14 @@ class Node(object):
         self.outbox_timing[message.uid] = time
         if self.SDN:
             if self.sdn_strategy == "ROUTE":
+                if self.pre_approve_routes:
+                    if message.destination not in self.pending_new_route.keys():
+                        self.add_flow_to_outbox(message)
+                        self.pending_new_route[message.destination] = 1
+                        self.controller.update_routes_for_packet(message, real_arrival = False)
+                        msg_data['pre-approved'] = msg_data['pre-approved'] + 1
+                    else:
+                        self.pending_new_route[message.destination] = self.pending_new_route[message.destination] + 1
                 msg = Message({'request':message}, self.id, self.controller_id, self.controller_id, time, 1, True)
                 self.route_message(msg)
             elif self.sdn_strategy in ["BROADCAST", "FLOOD", "GATEWAY"]:

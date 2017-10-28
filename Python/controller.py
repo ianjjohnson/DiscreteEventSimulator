@@ -23,6 +23,8 @@ class Controller(Node):
         self.async_updates = ASYNC_UPDATES
         self.routing_updates = []
         self.pre_approve_routes = PRE_APPROVE_ROUTES
+        self.has_computed_shortest_paths = False
+        self.shortest_paths = []
 
     def iterate(self, time):
         for index, node in self.nodes.items():
@@ -36,6 +38,7 @@ class Controller(Node):
         if self.one_hop:
             self.routing_table[node.id] = node.id
         self.routing_updates.append({})
+        self.shortest_paths.append({})
 
     def assign_neighbors(self, mean_neighbors_per_node):
         num_nodes = len(self.nodes)
@@ -84,30 +87,40 @@ class Controller(Node):
 
     def update_routes_for_packet(self, message, sdn=True, real_arrival=True):
 
+        if not self.has_computed_shortest_paths:
+
+            for source in self.nodes.keys():
+
+                if source == self.id and self.one_hop: continue
+
+                unvisited = {node: None for node in self.nodes.keys()} # None = +inf
+                visited = {}
+                path = {}
+                current_distance = 0
+                current = source
+                unvisited[current] = current_distance
+
+                while True:
+                    for neighbor, distance in self.nodes[current].neighbors.items():
+                        if neighbor not in unvisited: continue
+                        new_distance = current_distance + distance
+                        if unvisited[neighbor] is None or unvisited[neighbor] > new_distance:
+                            unvisited[neighbor] = new_distance
+                            path[neighbor] = current
+                    visited[current] = current_distance
+                    del unvisited[current]
+                    if not unvisited: break
+                    candidates = [node for node in unvisited.items() if node[1]]
+                    if len(candidates) == 0: break
+                    current, current_distance = sorted(candidates, key = lambda x: x[1])[0]
+
+                self.shortest_paths[source] = path
+
+            self.has_computed_shortest_paths = True
+
         for source in self.nodes.keys():
 
-            if source == self.id and self.one_hop: continue
-
-            unvisited = {node: None for node in self.nodes.keys()} # None = +inf
-            visited = {}
-            path = {}
-            current_distance = 0
-            current = source
-            unvisited[current] = current_distance
-
-            while True:
-                for neighbor, distance in self.nodes[current].neighbors.items():
-                    if neighbor not in unvisited: continue
-                    new_distance = current_distance + distance
-                    if unvisited[neighbor] is None or unvisited[neighbor] > new_distance:
-                        unvisited[neighbor] = new_distance
-                        path[neighbor] = current
-                visited[current] = current_distance
-                del unvisited[current]
-                if not unvisited: break
-                candidates = [node for node in unvisited.items() if node[1]]
-                if len(candidates) == 0: break
-                current, current_distance = sorted(candidates, key = lambda x: x[1])[0]
+            path = self.shortest_paths[source]
 
             if sdn:
                 if source != message.destination:

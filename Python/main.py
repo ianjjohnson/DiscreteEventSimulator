@@ -7,7 +7,7 @@ import math
 lambda_ = 0.2 # Lambda for exponential distribution
 NETWORK_ARCHITECTURE = "MESH" # "MESH", "ALBERTO"
 MEAN_NEIGHBORS_PER_NODE = 4 # on average, this is 3-4 for mesh
-NUMBER_OF_NODES = 50
+NUMBER_OF_NODES = 500
 NUM_ITERATIONS = 2500
 MAX_PACKETS_PER_FLOW = 5
 UPTIME = 1

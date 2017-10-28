@@ -19,13 +19,14 @@ ONE_HOP_CONTROLLER = False
 ASYNC_UPDATES = True
 ASYNC_UPDATE_RATE = 100
 PRE_APPROVE_ROUTES = True
+WRITE_TO_LOG = False
 
 if(SDN_STRATEGY == "BROADCAST"):
     ONE_HOP_CONTROLLER = False
 elif SDN_STRATEGY == "GATEWAY":
     ONE_HOP_CONTROLLER = True
 
-logfile = open('sdn.dat' if SDN else 'net.dat', 'w')
+logfile = open('/dev/null' if not WRITE_TO_LOG else('sdn.dat' if SDN else 'net.dat'), 'w')
 controller = controller.Controller(logfile, ONE_HOP_CONTROLLER, NUMBER_OF_NODES, SDN, SDN_STRATEGY, UPTIME, ASYNC_UPDATES, PRE_APPROVE_ROUTES)
 
 if ONE_HOP_CONTROLLER:
@@ -159,8 +160,6 @@ print("Travel Time: " + str(len(nd.msg_data['travel_time'])))
 # print(msg_data['travel_time'])
 print("Mean: " + str(np.mean(nd.msg_data['travel_time'])))
 print("Standard Deviation: " + str(np.std(nd.msg_data['travel_time'])))
-
-print(nd.msg_data['wait_time'])
 
 if PRE_APPROVE_ROUTES:
     print("Pre approved: " + str(nd.msg_data['pre-approved']))

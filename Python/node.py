@@ -2,6 +2,9 @@ from message import Message
 import random
 import copy
 
+msg_num = 0
+msg_data = {'wait_time' : [], 'arrival': {}, 'travel_time': [], 'overhead_nodes': 0}
+
 class Node(object):
     def __init__(self, controller, node_type, uid, neighbors, SDN, SDN_STRATEGY, uptime = 1.0):
         self.position = (0,0,0)
@@ -59,9 +62,9 @@ class Node(object):
                 if self.id != self.controller_id and message.uid in self.outbox_timing:
                     delta = time - self.outbox_timing[message.uid]
                     self.logfile.write("Wait time: " + str(delta) + "\n")
-                    message.msg_data['wait_time'].append(delta)
+                    msg_data['wait_time'].append(delta)
                     if not message.is_sdn_control:
-                        message.msg_data['arrival'][message.uid] = time
+                        msg_data['arrival'][message.uid] = time
                     del self.outbox_timing[message.uid]
                 del self.outbox[index]
                 return
@@ -94,7 +97,7 @@ class Node(object):
                 elif self.sdn_strategy == "GATEWAY":
                     self.outbox.append((self.controller_id, message))
                 elif self.sdn_strategy == "ROUTE":
-                    self.route_message(copy.copy(message))
+                    self.inbox.append(copy.copy(message))
             else:
                 self.route_message(copy.copy(message))
 
@@ -113,9 +116,9 @@ class Node(object):
 
     def arrive(self, message):
         self.logfile.write("Message with ID " + str(message.uid) + " arrived at destination node " + str(self.id) + ".\n")
-        if not message.is_sdn_control and message.uid in message.msg_data['arrival']:
-            message.msg_data['travel_time'].append(self.time - message.msg_data['arrival'][message.uid])
-            del message.msg_data['arrival'][message.uid]
+        if not message.is_sdn_control and message.uid in msg_data['arrival']:
+            msg_data['travel_time'].append(self.time - msg_data['arrival'][message.uid])
+            del msg_data['arrival'][message.uid]
 
     def route_message(self, message):
         key = message.uid if self.SDN else message.destination

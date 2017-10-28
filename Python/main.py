@@ -1,21 +1,23 @@
 import controller
-import node
+import node as nd
 import message
 import random
 import math
 
-lambda_ = 2 # Lambda for exponential distribution
+lambda_ = 0.05 # Lambda for exponential distribution
 NETWORK_ARCHITECTURE = "MESH" # "MESH", "ALBERTO"
 MEAN_NEIGHBORS_PER_NODE = 4 # on average, this is 3-4 for mesh
 NUMBER_OF_NODES = 10
-NUM_ITERATIONS = 50000
+NUM_ITERATIONS = 10000
 MAX_PACKETS_PER_FLOW = 5
 UPTIME = 1
 MAX_COST = 10
 READ_GRAPH = False
 SDN = True
-SDN_STRATEGY = "FLOOD" # "FLOOD", "BROADCAST", "ROUTE", "GATEWAY"
+SDN_STRATEGY = "ROUTE" # "FLOOD", "BROADCAST", "ROUTE", "GATEWAY"
 ONE_HOP_CONTROLLER = False
+ASYNC_UPDATES = True
+ASYNC_UPDATE_RATE = 20
 
 if(SDN_STRATEGY == "BROADCAST"):
     ONE_HOP_CONTROLLER = False
@@ -23,7 +25,7 @@ elif SDN_STRATEGY == "GATEWAY":
     ONE_HOP_CONTROLLER = True
 
 logfile = open('sdn.dat' if SDN else 'net.dat', 'w')
-controller = controller.Controller(logfile, ONE_HOP_CONTROLLER, NUMBER_OF_NODES, SDN, SDN_STRATEGY, UPTIME)
+controller = controller.Controller(logfile, ONE_HOP_CONTROLLER, NUMBER_OF_NODES, SDN, SDN_STRATEGY, UPTIME, ASYNC_UPDATES)
 
 if ONE_HOP_CONTROLLER:
     controller.neighbors = {}
@@ -48,7 +50,7 @@ def generate_network(c):
         for n in neighbors:
             neighborstring = neighborstring + " " + str(n) + "," + "1"#str(int(random.random()*MAX_COST) + 1)
         items = neighborstring.split(" ")
-        node.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME)
+        nd.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME)
 
 def generate_network_alberto(c, m = 5):
     num_connections = (m*m-m)/2.0
@@ -58,7 +60,7 @@ def generate_network_alberto(c, m = 5):
         for n in neighbors:
             neighborstring = neighborstring + " " + str(n) + "," + "1"#str(int(random.random()*MAX_COST) + 1)
         items = neighborstring.split(" ")
-        node.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME)
+        nd.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME)
 
     for i in range(m, NUMBER_OF_NODES):
         neighbors = []
@@ -73,7 +75,7 @@ def generate_network_alberto(c, m = 5):
         for n in neighbors:
             neighborstring = neighborstring + " " + str(n) + "," + "1"#str(int(random.random()*MAX_COST) + 1)
         items = neighborstring.split(" ")
-        node.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME)
+        nd.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME)
 
 
 
@@ -116,45 +118,46 @@ for nodeid, node in controller.nodes.items():
 
 #msg = message.Message({"body":"tests"}, 0, 0, 1, -1, 1)
 #controller.get_node(0).send_message(msg, -1)
-
-msg_num = 0
-msg_data = {'wait_time' : [], 'arrival': {}, 'travel_time': [], 'overhead_nodes': 0}
-
 msg = message.Message({"init":"test"}, 0, 0, 1, -1, 1, False)
 controller.update_routes_for_packet(msg, sdn=False)
 
 def init_message(time):
-    global msg_num
-    global msg_data
     source = int(random.random()*NUMBER_OF_NODES)
     destination = source
     while destination == source:
         destination = int(random.random()*NUMBER_OF_NODES)
     flow_size = max(1, int(random.random()*MAX_PACKETS_PER_FLOW))
-    msg = message.Message({"body":str(msg_num)}, source, source, destination, time, flow_size, False, msg_data)
+    msg = message.Message({"body":str(nd.msg_num)}, source, source, destination, time, flow_size, False)
     controller.get_node(source).send_message(msg, time)
-    msg_num = msg_num + 1
+    nd.msg_num = nd.msg_num + 1
 
+time_since_last_send = 0
 for time in range(NUM_ITERATIONS):
     logfile.write("### Beginning Iteration " + str(time) + " ###\n")
     controller.iterate(time)
 
-    if random.expovariate(lambda_) > 1:
+    if(ASYNC_UPDATES and time%ASYNC_UPDATE_RATE == 0 and time != 0):
+        controller.perform_async_routing_update()
+
+    if random.random() < (1.0 - math.exp(-1.0 * lambda_ * time_since_last_send)):
         init_message(time)
+        time_since_last_send = 0
+
+    time_since_last_send = time_since_last_send + 1
 
 import numpy as np
 
-print("Number of messages: " + str(msg_num))
+print("Number of messages: " + str(nd.msg_num))
 
-print("Wait Time: " + str(len(msg_data['wait_time'])))
+print("Wait Time: " + str(len(nd.msg_data['wait_time'])))
 # print(msg_data['wait_time'])
-print("Mean: " + str(np.mean(msg_data['wait_time'])))
-print("Standard Deviation: " + str(np.std(msg_data['wait_time'])))
+print("Mean: " + str(np.mean(nd.msg_data['wait_time'])))
+print("Standard Deviation: " + str(np.std(nd.msg_data['wait_time'])))
 
-print("Travel Time: " + str(len(msg_data['travel_time'])))
+print("Travel Time: " + str(len(nd.msg_data['travel_time'])))
 # print(msg_data['travel_time'])
-print("Mean: " + str(np.mean(msg_data['travel_time'])))
-print("Standard Deviation: " + str(np.std(msg_data['travel_time'])))
+print("Mean: " + str(np.mean(nd.msg_data['travel_time'])))
+print("Standard Deviation: " + str(np.std(nd.msg_data['travel_time'])))
 
 print("Mean number of neighbors: " + str(np.mean([len(x.neighbors) for x in controller.nodes.values() if x != controller])))
 

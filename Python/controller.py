@@ -3,7 +3,7 @@ from message import Message
 from node import Node
 
 class Controller(Node):
-    def __init__(self, logfile, one_hop, controller_id = 1000001, sdn=True, SDN_STRATEGY="ROUTE", UPTIME = 1.0):
+    def __init__(self, logfile, one_hop, controller_id = 1000001, sdn=True, SDN_STRATEGY="ROUTE", UPTIME = 1.0, ASYNC_UPDATES = False):
         self.nodes = {}
         self.logfile = logfile
         self.inbox = []
@@ -20,6 +20,8 @@ class Controller(Node):
         self.mst_edges = []
         self.sdn_strategy = SDN_STRATEGY
         self.uptime = UPTIME
+        self.async_updates = ASYNC_UPDATES
+        self.routing_updates = []
 
     def iterate(self, time):
         for index, node in self.nodes.items():
@@ -32,6 +34,7 @@ class Controller(Node):
         node.logfile = self.logfile
         if self.one_hop:
             self.routing_table[node.id] = node.id
+        self.routing_updates.append({})
 
     def assign_neighbors(self, mean_neighbors_per_node):
         num_nodes = len(self.nodes)
@@ -72,6 +75,12 @@ class Controller(Node):
             return self
         return self.nodes[nodeid]
 
+    def perform_async_routing_update(self):
+        for node in self.nodes.keys():
+            routing_message = Message({"routing": self.routing_updates[node]}, 0, node, node, self.time, 1, True)
+            self.route_message(routing_message)
+        self.routing_updates = [{} for _ in self.nodes.keys()]
+
     def update_routes_for_packet(self, message, sdn=True):
 
         for source in self.nodes.keys():
@@ -105,10 +114,14 @@ class Controller(Node):
                 else:
                     path = {}
 
-                routing_message = Message({"routing": path}, 0, source, source, self.time, 1, True)
-                #for node in self.nodes.keys():
-                #    self.outbox.append((node, routing_message))
-                self.route_message(routing_message)
+                if not self.async_updates:
+                    routing_message = Message({"routing": path}, 0, source, source, self.time, 1, True)
+                    self.route_message(routing_message)
+                else:
+                    if(self.id == source):
+                        self.routing_table.update(path)
+                    else:
+                        self.routing_updates[source].update(path)
             else:
                 self.nodes[source].update_routing_table(path)
 

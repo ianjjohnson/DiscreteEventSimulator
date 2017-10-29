@@ -63,8 +63,6 @@ class Node(object):
                                    + str(next_hop) + ".\n")
                 if self.id != self.controller_id and message.uid in self.outbox_timing:
                     delta = time - self.outbox_timing[message.uid]
-                    if(delta > 10):
-                        print(delta, time, self.outbox_timing[message.uid], message.uid)
                     self.logfile.write("Wait time: " + str(delta) + "\n")
                     msg_data['wait_time'].append(delta)
                     if not message.is_sdn_control:
@@ -83,16 +81,14 @@ class Node(object):
             return
 
         if 'flow' in message.contents:
-            if self.pre_approve_routes:
-                if message.contents['flow'].destination in self.pending_new_route.keys():
-                    self.add_flow_to_outbox(message.contents['flow'])
-                    self.pending_new_route[message.contents['flow'].destination] = self.pending_new_route[message.contents['flow'].destination] - 1
-                    if(self.pending_new_route[message.contents['flow'].destination] == 0):
-                        del self.pending_new_route[message.contents['flow'].destination]
-            else:
+            if not self.pre_approve_routes:
                 self.add_flow_to_outbox(message.contents['flow'])
         if 'routing' in message.contents and message.destination == self.id:
             self.update_routing_table(message.contents['routing'])
+            if self.pre_approve_routes:
+                for m_id in message.contents['routing'].keys():
+                    if m_id in self.pending_new_route:
+                        del self.pending_new_route[m_id]
         if not self.route_message(message):
             self.inbox.append(message)
 
@@ -161,16 +157,14 @@ class Node(object):
         self.outbox_timing[message.uid] = time
         if self.SDN:
             if self.sdn_strategy == "ROUTE":
+                msg = Message({'request':message}, self.id, self.controller_id, self.controller_id, time, 1, True)
                 if self.pre_approve_routes:
-                    if message.destination not in self.pending_new_route.keys():
-                        self.add_flow_to_outbox(message)
-                        self.outbox_timing[message.uid] = self.outbox_timing[message.uid] + 1 # correct for fact that we add it to inbox here
-                        self.pending_new_route[message.destination] = 1
+                    self.outbox_timing[message.uid] = self.outbox_timing[message.uid] + 1 # correct for fact that we add it to inbox here
+                    self.add_flow_to_outbox(message)
+                    if (self.id, message.destination) not in self.pending_new_route.values():
                         self.controller.update_routes_for_packet(message, real_arrival = False)
                         msg_data['pre-approved'] = msg_data['pre-approved'] + 1
-                    else:
-                        self.pending_new_route[message.destination] = self.pending_new_route[message.destination] + 1
-                msg = Message({'request':message}, self.id, self.controller_id, self.controller_id, time, 1, True)
+                    self.pending_new_route[message.uid] = (self.id, message.destination)
                 self.route_message(msg)
             elif self.sdn_strategy in ["BROADCAST", "FLOOD", "GATEWAY"]:
                 self.add_flow_to_outbox(message)

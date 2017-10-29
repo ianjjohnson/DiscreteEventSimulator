@@ -4,11 +4,11 @@ import message
 import random
 import math
 
-lambda_ = 0.2 # Lambda for exponential distribution
+lambda_ = .05 # Lambda for exponential distribution
 NETWORK_ARCHITECTURE = "ALBERTO" # "MESH", "ALBERTO"
 MEAN_NEIGHBORS_PER_NODE = 4 # on average, this is 3-4 for mesh
-NUMBER_OF_NODES = 250
-NUM_ITERATIONS = 2500
+NUMBER_OF_NODES = 5
+NUM_ITERATIONS = 2000
 MAX_PACKETS_PER_FLOW = 5
 UPTIME = 1
 MAX_COST = 10
@@ -17,9 +17,9 @@ SDN = True
 SDN_STRATEGY = "ROUTE" # "FLOOD", "BROADCAST", "ROUTE", "GATEWAY"
 ONE_HOP_CONTROLLER = False
 ASYNC_UPDATES = True
-ASYNC_UPDATE_RATE = 100
+ASYNC_UPDATE_RATE = 50
 PRE_APPROVE_ROUTES = True
-WRITE_TO_LOG = True
+WRITE_TO_LOG = False
 PRINT_PROGRESS_FREQUENCY = 500
 
 if(SDN_STRATEGY == "BROADCAST"):
@@ -121,8 +121,8 @@ if SDN_STRATEGY in ["BROADCAST"]:
                 X.append(n)
         index = index + 1
 
-#for nodeid, node in controller.nodes.items():
-#    print(nodeid, node.neighbors, node.mst_edges)
+for nodeid, node in controller.nodes.items():
+    print(nodeid, node.neighbors, node.mst_edges)
 
 #msg = message.Message({"body":"tests"}, 0, 0, 1, -1, 1)
 #controller.get_node(0).send_message(msg, -1)

@@ -120,6 +120,9 @@ class Controller(Node):
 
         for source in self.nodes.keys():
 
+            if source == self.id and self.one_hop:
+                continue
+
             path = self.shortest_paths[source]
 
             if sdn:

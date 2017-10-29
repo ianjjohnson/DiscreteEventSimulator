@@ -63,6 +63,8 @@ class Node(object):
                                    + str(next_hop) + ".\n")
                 if self.id != self.controller_id and message.uid in self.outbox_timing:
                     delta = time - self.outbox_timing[message.uid]
+                    if(delta > 10):
+                        print(delta, time, self.outbox_timing[message.uid], message.uid)
                     self.logfile.write("Wait time: " + str(delta) + "\n")
                     msg_data['wait_time'].append(delta)
                     if not message.is_sdn_control:
@@ -162,6 +164,7 @@ class Node(object):
                 if self.pre_approve_routes:
                     if message.destination not in self.pending_new_route.keys():
                         self.add_flow_to_outbox(message)
+                        self.outbox_timing[message.uid] = self.outbox_timing[message.uid] + 1 # correct for fact that we add it to inbox here
                         self.pending_new_route[message.destination] = 1
                         self.controller.update_routes_for_packet(message, real_arrival = False)
                         msg_data['pre-approved'] = msg_data['pre-approved'] + 1

@@ -5,9 +5,9 @@ import random
 import math
 
 lambda_ = 0.2 # Lambda for exponential distribution
-NETWORK_ARCHITECTURE = "MESH" # "MESH", "ALBERTO"
+NETWORK_ARCHITECTURE = "ALBERTO" # "MESH", "ALBERTO"
 MEAN_NEIGHBORS_PER_NODE = 4 # on average, this is 3-4 for mesh
-NUMBER_OF_NODES = 500
+NUMBER_OF_NODES = 250
 NUM_ITERATIONS = 2500
 MAX_PACKETS_PER_FLOW = 5
 UPTIME = 1
@@ -19,7 +19,8 @@ ONE_HOP_CONTROLLER = False
 ASYNC_UPDATES = True
 ASYNC_UPDATE_RATE = 100
 PRE_APPROVE_ROUTES = True
-WRITE_TO_LOG = False
+WRITE_TO_LOG = True
+PRINT_PROGRESS_FREQUENCY = 500
 
 if(SDN_STRATEGY == "BROADCAST"):
     ONE_HOP_CONTROLLER = False
@@ -33,9 +34,10 @@ if ONE_HOP_CONTROLLER:
     controller.neighbors = {}
 else:
     controller.neighbors = {}
-    for i in range(NUMBER_OF_NODES):
-        if random.random() < ((MEAN_NEIGHBORS_PER_NODE-2)/NUMBER_OF_NODES):
-            controller.neighbors[i] = int(random.random()*MAX_COST)
+    while(len(controller.neighbors) == 0):
+        for i in range(NUMBER_OF_NODES):
+            if random.random() < ((MEAN_NEIGHBORS_PER_NODE-2)/NUMBER_OF_NODES):
+                controller.neighbors[i] = int(random.random()*MAX_COST)
 
 def generate_network(c):
     nbrs = [[] for _ in range(NUMBER_OF_NODES)]
@@ -79,7 +81,10 @@ def generate_network_alberto(c, m = 5):
         items = neighborstring.split(" ")
         nd.Node(c, items[0], items[1], items[2:], SDN, SDN_STRATEGY, uptime = UPTIME, PRE_APPROVE_ROUTES=PRE_APPROVE_ROUTES)
 
+    for node, cost in controller.neighbors.items():
+        controller.get_node(node).neighbors[controller.id] = cost
 
+print("Loading Network...")
 
 if(READ_GRAPH):
 
@@ -102,6 +107,7 @@ controller.write_network_to_file("graph.dat")
 
 # Compute Minimum Spanning Tree
 if SDN_STRATEGY in ["BROADCAST"]:
+    print("Computing Minimal Spanning Tree...")
     X = [0,1] # The nodes in the MST
     controller.get_node(0).mst_edges.append(1)
     controller.get_node(1).mst_edges.append(0)
@@ -115,11 +121,13 @@ if SDN_STRATEGY in ["BROADCAST"]:
                 X.append(n)
         index = index + 1
 
-for nodeid, node in controller.nodes.items():
-    print(nodeid, node.neighbors, node.mst_edges)
+#for nodeid, node in controller.nodes.items():
+#    print(nodeid, node.neighbors, node.mst_edges)
 
 #msg = message.Message({"body":"tests"}, 0, 0, 1, -1, 1)
 #controller.get_node(0).send_message(msg, -1)
+print("Computing Shortest Paths...")
+
 msg = message.Message({"init":"test"}, 0, 0, 1, -1, 1, False)
 controller.update_routes_for_packet(msg, sdn=False)
 
@@ -137,6 +145,9 @@ time_since_last_send = 0
 for time in range(NUM_ITERATIONS):
     logfile.write("### Beginning Iteration " + str(time) + " ###\n")
 
+    if(time%PRINT_PROGRESS_FREQUENCY == 0):
+        print("Iteration: " + str(time))
+
     if(ASYNC_UPDATES and time%ASYNC_UPDATE_RATE == 0 and time != 0):
         controller.perform_async_routing_update()
 
@@ -152,6 +163,7 @@ import numpy as np
 print("Number of messages: " + str(nd.msg_num))
 
 print("Wait Time: " + str(len(nd.msg_data['wait_time'])))
+print(nd.msg_data['wait_time'])
 # print(msg_data['wait_time'])
 print("Mean: " + str(np.mean(nd.msg_data['wait_time'])))
 print("Standard Deviation: " + str(np.std(nd.msg_data['wait_time'])))
